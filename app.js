@@ -1,4 +1,4 @@
-// --- 1. INITIAL SETUP ---
+// --- 1. SETUP SCENE ---
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -15,11 +15,13 @@ const colors = new Float32Array(particleCount * 3);
 
 const saturnPos = new Float32Array(particleCount * 3);
 const eiffelPos = new Float32Array(particleCount * 3);
-const supernovaPos = new Float32Array(particleCount * 3);
+const earthPos = new Float32Array(particleCount * 3);
+const earthColors = new Float32Array(particleCount * 3); // Warna khusus Bumi
 
 let currentTarget = saturnPos;
 let morphSpeed = 0.08;
 let targetColor = new THREE.Color(0xffd700);
+let isEarthMode = false;
 
 // --- 3. SHAPE GENERATOR ---
 for (let i = 0; i < particleCount; i++) {
@@ -51,111 +53,106 @@ for (let i = 0; i < particleCount; i++) {
     eiffelPos[i * 3 + 1] = ey;
     eiffelPos[i * 3 + 2] = (Math.random() - 0.5) * w;
 
-    // C. SUPERNOVA
-    const dir = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
-    const burst = 18 + Math.random() * 25;
-    supernovaPos[i * 3] = dir.x * burst;
-    supernovaPos[i * 3 + 1] = dir.y * burst;
-    supernovaPos[i * 3 + 2] = dir.z * burst;
+    // C. BUMI (Planet Bola dengan pola warna daratan/laut)
+    const phiE = Math.acos(-1 + (2 * i) / particleCount);
+    const thetaE = Math.sqrt(particleCount * Math.PI) * phiE;
+    const rE = 4.0; // Ukuran Bumi sedikit lebih besar
+    earthPos[i * 3] = rE * Math.cos(thetaE) * Math.sin(phiE);
+    earthPos[i * 3 + 1] = rE * Math.sin(thetaE) * Math.sin(phiE);
+    earthPos[i * 3 + 2] = rE * Math.cos(phiE);
 
-    // Initial State
+    // Warna Bumi (Logika sederhana untuk daratan hijau & laut biru)
+    const noise = Math.sin(thetaE * 5) * Math.cos(phiE * 5);
+    const earthCol = new THREE.Color();
+    if (noise > 0.1) {
+        earthCol.setHex(0x228b22); // Hijau (Forest)
+    } else {
+        earthCol.setHex(0x0000ff); // Biru (Ocean)
+    }
+    earthColors[i * 3] = earthCol.r;
+    earthColors[i * 3 + 1] = earthCol.g;
+    earthColors[i * 3 + 2] = earthCol.b;
+
+    // Initial State (Saturnus)
     positions[i * 3] = sx;
     positions[i * 3 + 1] = sy;
     positions[i * 3 + 2] = sz;
-
-    const col = new THREE.Color();
-    col.setHSL(0.1, 0.7, 0.5);
-    colors[i * 3] = col.r;
-    colors[i * 3 + 1] = col.g;
-    colors[i * 3 + 2] = col.b;
+    colors[i * 3] = 1.0; colors[i * 3 + 1] = 0.84; colors[i * 3 + 2] = 0;
 }
 
 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-const material = new THREE.PointsMaterial({ 
-    size: 0.018, 
-    vertexColors: true, 
-    transparent: true, 
-    opacity: 0.8, 
-    blending: THREE.AdditiveBlending 
-});
+const material = new THREE.PointsMaterial({ size: 0.02, vertexColors: true, transparent: true, opacity: 0.9 });
 const points = new THREE.Points(geometry, material);
 scene.add(points);
 
 // --- 4. MEDIA PIPE HANDS ---
 const videoElement = document.getElementById('input_video');
 const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-
 hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6 });
 
 hands.onResults((res) => {
     if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
         const pts = res.multiHandLandmarks[0];
 
-        // 1. Update Posisi (Ikuti Telapak Tangan)
         points.position.x = THREE.MathUtils.lerp(points.position.x, (pts[9].x - 0.5) * -30, 0.1);
         points.position.y = THREE.MathUtils.lerp(points.position.y, (pts[9].y - 0.5) * -20, 0.1);
 
-        // 2. Logika Jari (Sangat Penting: Urutan harus Supernova dulu!)
-        // Landmark 8 = Telunjuk, Landmark 12 = Jari Tengah
-        // Kita cek apakah ujung jari lebih tinggi dari ruas kedua (Landmark 6 & 10)
-        const isIndexUp = pts[8].y < pts[6].y - 0.05;
-        const isMiddleUp = pts[12].y < pts[10].y - 0.05;
+        const indexUp = pts[8].y < pts[6].y - 0.05;
+        const middleUp = pts[12].y < pts[10].y - 0.05;
 
-        // CEK DUA JARI DULU
-        if (isIndexUp && isMiddleUp) {
-            // Jika dua-duanya naik -> Supernova
-            if (currentTarget !== supernovaPos) console.log("BOOM! Supernova");
-            currentTarget = supernovaPos;
-            morphSpeed = 0.25; // Ledakan sangat cepat
-            targetColor.setHex(0xff4500); 
-        } 
-        // CEK TELUNJUK SAJA
-        else if (isIndexUp) {
+        if (indexUp && middleUp) {
+            currentTarget = earthPos;
+            isEarthMode = true;
+            morphSpeed = 0.1;
+        } else if (indexUp) {
             currentTarget = eiffelPos;
-            morphSpeed = 0.08;
+            isEarthMode = false;
             targetColor.setHex(0xffffff);
-        } 
-        // JIKA TIDAK ADA / MENGEPAL
-        else {
-            currentTarget = saturnPos;
             morphSpeed = 0.08;
+        } else {
+            currentTarget = saturnPos;
+            isEarthMode = false;
             targetColor.setHex(0xffd700);
+            morphSpeed = 0.08;
         }
 
-        // 3. Zoom (Jempol ke Kelingking agar tidak ganggu jari tengah)
-        const sDist = Math.hypot(pts[4].x - pts[20].x, pts[4].y - pts[20].y);
-        points.scale.lerp(new THREE.Vector3().setScalar(sDist < 0.1 ? 2.5 : 1.0), 0.1);
+        const sDist = Math.hypot(pts[4].x - pts[16].x, pts[4].y - pts[16].y);
+        points.scale.lerp(new THREE.Vector3().setScalar(sDist < 0.08 ? 2.5 : 1.0), 0.1);
     }
 });
 
-const cameraUtils = new Camera(videoElement, {
-    onFrame: async () => { await hands.send({image: videoElement}); },
-    width: 640, height: 480
-});
-cameraUtils.start();
+new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 640, height: 480 }).start();
 
 // --- 5. ANIMATION LOOP ---
 function animate() {
     requestAnimationFrame(animate);
     const pos = geometry.attributes.position;
+    const col = geometry.attributes.color;
     
     for (let i = 0; i < particleCount; i++) {
         const idx = i * 3;
+        // Morph Posisi
         pos.array[idx] += (currentTarget[idx] - pos.array[idx]) * morphSpeed;
         pos.array[idx+1] += (currentTarget[idx+1] - pos.array[idx+1]) * morphSpeed;
         pos.array[idx+2] += (currentTarget[idx+2] - pos.array[idx+2]) * morphSpeed;
+
+        // Morph Warna (Jika Bumi gunakan earthColors, jika tidak gunakan targetColor)
+        if (isEarthMode) {
+            col.array[idx] += (earthColors[idx] - col.array[idx]) * 0.1;
+            col.array[idx+1] += (earthColors[idx+1] - col.array[idx+1]) * 0.1;
+            col.array[idx+2] += (earthColors[idx+2] - col.array[idx+2]) * 0.1;
+        } else {
+            col.array[idx] += (targetColor.r - col.array[idx]) * 0.1;
+            col.array[idx+1] += (targetColor.g - col.array[idx+1]) * 0.1;
+            col.array[idx+2] += (targetColor.b - col.array[idx+2]) * 0.1;
+        }
     }
     
     pos.needsUpdate = true;
-    material.color.lerp(targetColor, 0.1);
-    
-    if (currentTarget === supernovaPos) {
-        points.rotation.y += 0.05;
-    } else {
-        points.rotation.y += 0.003;
-    }
+    col.needsUpdate = true;
+    points.rotation.y += 0.005;
 
     renderer.render(scene, camera);
 }
