@@ -5,117 +5,113 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-camera.position.z = 10;
+camera.position.z = 15;
 
-// --- 2. PARTICLE CONFIGURATION ---
-const particleCount = 10000; 
+// --- 2. KONFIGURASI PARTIKEL ---
+const particleCount = 50000; 
 const geometry = new THREE.BufferGeometry();
 const positions = new Float32Array(particleCount * 3); 
 const colors = new Float32Array(particleCount * 3);
 
 const saturnPositions = new Float32Array(particleCount * 3);
 const eiffelPositions = new Float32Array(particleCount * 3);
+const supernovaPositions = new Float32Array(particleCount * 3);
 
 let currentMorphTarget = saturnPositions; 
+let morphSpeed = 0.08;
 
-// --- 3. GENERATE SATURN SHAPE ---
-const sphereCount = Math.floor(particleCount * 0.4);
+// --- 3. GENERATE SHAPES ---
+
 for (let i = 0; i < particleCount; i++) {
-    let x, y, z;
-    const color = new THREE.Color();
-
-    if (i < sphereCount) {
-        const phi = Math.acos(-1 + (2 * i) / sphereCount);
-        const theta = Math.sqrt(sphereCount * Math.PI) * phi;
-        const r = 1.8;
-        x = r * Math.cos(theta) * Math.sin(phi);
-        y = r * Math.sin(theta) * Math.sin(phi);
-        z = r * Math.cos(phi);
-        color.setHex(0xffd700); 
+    // A. SATURNUS
+    let sx, sy, sz;
+    if (i < particleCount * 0.45) {
+        const phi = Math.acos(-1 + (2 * i) / (particleCount * 0.45));
+        const theta = Math.sqrt(particleCount * 0.45 * Math.PI) * phi;
+        sx = 2.5 * Math.cos(theta) * Math.sin(phi);
+        sy = 2.5 * Math.sin(theta) * Math.sin(phi);
+        sz = 2.5 * Math.cos(phi);
     } else {
         const angle = Math.random() * Math.PI * 2;
-        const distance = 2.5 + Math.random() * 2.0;
-        const tilt = Math.PI / 3.5;
-        const tempX = Math.cos(angle) * distance;
-        const tempY = (Math.random() - 0.5) * 0.1;
-        const tempZ = Math.sin(angle) * distance;
-        x = tempX;
-        y = tempY * Math.cos(tilt) - tempZ * Math.sin(tilt);
-        z = tempY * Math.sin(tilt) + tempZ * Math.cos(tilt);
-        color.setHex(0xc2b280);
+        const dist = 3.5 + Math.random() * 3;
+        sx = Math.cos(angle) * dist;
+        sy = (Math.random() - 0.5) * 0.2;
+        sz = Math.sin(angle) * dist;
     }
-    saturnPositions[i * 3] = x;
-    saturnPositions[i * 3 + 1] = y;
-    saturnPositions[i * 3 + 2] = z;
-    
-    positions[i * 3] = x;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = z;
+    saturnPositions[i * 3] = sx;
+    saturnPositions[i * 3 + 1] = sy;
+    saturnPositions[i * 3 + 2] = sz;
 
+    // B. EIFFEL
+    const h = 12;
+    const ey = (Math.random() * h) - h/2;
+    const normY = (ey + h/2) / h;
+    const w = 4 * Math.pow(1 - normY, 2) + 0.2;
+    eiffelPositions[i * 3] = (Math.random() - 0.5) * w;
+    eiffelPositions[i * 3 + 1] = ey;
+    eiffelPositions[i * 3 + 2] = (Math.random() - 0.5) * w;
+
+    // C. SUPERNOVA (Ledakan ke segala arah)
+    const direction = new THREE.Vector3(
+        Math.random() - 0.5,
+        Math.random() - 0.5,
+        Math.random() - 0.5
+    ).normalize();
+    const explosionDist = 15 + Math.random() * 20; // Partikel terpental jauh
+    supernovaPositions[i * 3] = direction.x * explosionDist;
+    supernovaPositions[i * 3 + 1] = direction.y * explosionDist;
+    supernovaPositions[i * 3 + 2] = direction.z * explosionDist;
+
+    // Setup Awal
+    positions[i * 3] = sx;
+    positions[i * 3 + 1] = sy;
+    positions[i * 3 + 2] = sz;
+    
+    const color = new THREE.Color();
+    color.setHSL(Math.random() * 0.2 + 0.05, 0.8, 0.6);
     colors[i * 3] = color.r;
     colors[i * 3 + 1] = color.g;
     colors[i * 3 + 2] = color.b;
 }
 
-// --- 4. GENERATE EIFFEL SHAPE ---
-for (let i = 0; i < particleCount; i++) {
-    const h = 8; 
-    const y = (Math.random()) * h - (h/2);
-    const normalizedY = (y + h/2) / h; 
-    const widthAtY = 2.5 * Math.pow(1 - normalizedY, 1.5) + 0.1; 
-    
-    let x, z;
-    if (normalizedY < 0.3) {
-        const legIdx = Math.floor(Math.random() * 4);
-        const legOffset = 1.2 * (1 - normalizedY);
-        const offsetX = (legIdx === 0 || legIdx === 1) ? legOffset : -legOffset;
-        const offsetZ = (legIdx === 0 || legIdx === 2) ? legOffset : -legOffset;
-        x = (Math.random() - 0.5) * widthAtY * 0.5 + offsetX;
-        z = (Math.random() - 0.5) * widthAtY * 0.5 + offsetZ;
-    } else {
-        x = (Math.random() - 0.5) * widthAtY;
-        z = (Math.random() - 0.5) * widthAtY;
-    }
-    eiffelPositions[i * 3] = x;
-    eiffelPositions[i * 3 + 1] = y;
-    eiffelPositions[i * 3 + 2] = z;
-}
-
 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-const material = new THREE.PointsMaterial({ size: 0.035, vertexColors: true, transparent: true, opacity: 0.9 });
+const material = new THREE.PointsMaterial({ size: 0.02, vertexColors: true, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
 const particlePoints = new THREE.Points(geometry, material);
 scene.add(particlePoints);
 
-// --- 5. HAND TRACKING LOGIC ---
+// --- 4. HAND TRACKING ---
 const videoElement = document.getElementById('input_video');
 const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
 
-hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6 });
 
 hands.onResults((results) => {
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
 
-        // Posisi
-        const targetX = (landmarks[9].x - 0.5) * -20;
-        const targetY = (landmarks[9].y - 0.5) * -12;
-        particlePoints.position.x = THREE.MathUtils.lerp(particlePoints.position.x, targetX, 0.1);
-        particlePoints.position.y = THREE.MathUtils.lerp(particlePoints.position.y, targetY, 0.1);
+        // Ikuti Tangan
+        const tx = (landmarks[9].x - 0.5) * -30;
+        const ty = (landmarks[9].y - 0.5) * -20;
+        particlePoints.position.x = THREE.MathUtils.lerp(particlePoints.position.x, tx, 0.1);
+        particlePoints.position.y = THREE.MathUtils.lerp(particlePoints.position.y, ty, 0.1);
 
-        // TRIGGER: Jari Telunjuk (Landmark 8 vs 6)
-        if (landmarks[8].y < landmarks[6].y - 0.05) {
+        // DETEKSI JARI
+        const isIndexUp = landmarks[8].y < landmarks[6].y - 0.1;
+        const isMiddleUp = landmarks[12].y < landmarks[10].y - 0.1;
+
+        if (isMiddleUp) {
+            // JARI TENGAH -> SUPERNOVA
+            currentMorphTarget = supernovaPositions;
+            morphSpeed = 0.15; // Ledakan lebih cepat
+        } else if (isIndexUp) {
+            // JARI TELUNJUK -> EIFFEL
             currentMorphTarget = eiffelPositions;
+            morphSpeed = 0.08;
         } else {
+            // DEFAULT -> SATURNUS
             currentMorphTarget = saturnPositions;
-        }
-
-        // ZOOM: Jempol (4) vs Jari Tengah (12)
-        const zoomDist = Math.hypot(landmarks[4].x - landmarks[12].x, landmarks[4].y - landmarks[12].y);
-        if (zoomDist < 0.06) { 
-            particlePoints.scale.lerp(new THREE.Vector3(2.2, 2.2, 2.2), 0.1);
-        } else {
-            particlePoints.scale.lerp(new THREE.Vector3(0.8, 0.8, 0.8), 0.1);
+            morphSpeed = 0.08;
         }
     }
 });
@@ -126,19 +122,22 @@ const cameraControl = new Camera(videoElement, {
 });
 cameraControl.start();
 
-// --- 6. ANIMATION LOOP ---
+// --- 5. ANIMATION LOOP ---
 function animate() {
     requestAnimationFrame(animate);
     const posAttr = geometry.attributes.position;
+    
     for (let i = 0; i < particleCount; i++) {
-        posAttr.setXYZ(i,
-            THREE.MathUtils.lerp(posAttr.getX(i), currentMorphTarget[i * 3], 0.07),
-            THREE.MathUtils.lerp(posAttr.getY(i), currentMorphTarget[i * 3 + 1], 0.07),
-            THREE.MathUtils.lerp(posAttr.getZ(i), currentMorphTarget[i * 3 + 2], 0.07)
-        );
+        const idx = i * 3;
+        posAttr.array[idx] += (currentMorphTarget[idx] - posAttr.array[idx]) * morphSpeed;
+        posAttr.array[idx+1] += (currentMorphTarget[idx+1] - posAttr.array[idx+1]) * morphSpeed;
+        posAttr.array[idx+2] += (currentMorphTarget[idx+2] - posAttr.array[idx+2]) * morphSpeed;
     }
+    
     posAttr.needsUpdate = true;
-    particlePoints.rotation.y += 0.003;
+    if (currentMorphTarget !== supernovaPositions) {
+        particlePoints.rotation.y += 0.003;
+    }
     renderer.render(scene, camera);
 }
 animate();
