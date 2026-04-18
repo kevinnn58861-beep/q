@@ -93,31 +93,40 @@ hands.onResults((res) => {
     if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
         const pts = res.multiHandLandmarks[0];
 
-        // Move following palm
+        // 1. Update Posisi (Ikuti Telapak Tangan)
         points.position.x = THREE.MathUtils.lerp(points.position.x, (pts[9].x - 0.5) * -30, 0.1);
         points.position.y = THREE.MathUtils.lerp(points.position.y, (pts[9].y - 0.5) * -20, 0.1);
 
-        // Gesture Logic
-        const indexUp = pts[8].y < pts[6].y - 0.08;
-        const middleUp = pts[12].y < pts[10].y - 0.08;
+        // 2. Logika Jari (Sangat Penting: Urutan harus Supernova dulu!)
+        // Landmark 8 = Telunjuk, Landmark 12 = Jari Tengah
+        // Kita cek apakah ujung jari lebih tinggi dari ruas kedua (Landmark 6 & 10)
+        const isIndexUp = pts[8].y < pts[6].y - 0.05;
+        const isMiddleUp = pts[12].y < pts[10].y - 0.05;
 
-        if (indexUp && middleUp) {
+        // CEK DUA JARI DULU
+        if (isIndexUp && isMiddleUp) {
+            // Jika dua-duanya naik -> Supernova
+            if (currentTarget !== supernovaPos) console.log("BOOM! Supernova");
             currentTarget = supernovaPos;
-            morphSpeed = 0.2;
-            targetColor.setHex(0xff4500); // Supernova Red
-        } else if (indexUp) {
+            morphSpeed = 0.25; // Ledakan sangat cepat
+            targetColor.setHex(0xff4500); 
+        } 
+        // CEK TELUNJUK SAJA
+        else if (isIndexUp) {
             currentTarget = eiffelPos;
             morphSpeed = 0.08;
-            targetColor.setHex(0xffffff); // Eiffel White
-        } else {
+            targetColor.setHex(0xffffff);
+        } 
+        // JIKA TIDAK ADA / MENGEPAL
+        else {
             currentTarget = saturnPos;
             morphSpeed = 0.08;
-            targetColor.setHex(0xffd700); // Saturn Gold
+            targetColor.setHex(0xffd700);
         }
 
-        // Scale Logic (Thumb to Ring Finger)
-        const sDist = Math.hypot(pts[4].x - pts[16].x, pts[4].y - pts[16].y);
-        points.scale.lerp(new THREE.Vector3().setScalar(sDist < 0.08 ? 2.5 : 1.0), 0.1);
+        // 3. Zoom (Jempol ke Kelingking agar tidak ganggu jari tengah)
+        const sDist = Math.hypot(pts[4].x - pts[20].x, pts[4].y - pts[20].y);
+        points.scale.lerp(new THREE.Vector3().setScalar(sDist < 0.1 ? 2.5 : 1.0), 0.1);
     }
 });
 
